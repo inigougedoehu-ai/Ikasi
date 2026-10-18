@@ -263,3 +263,37 @@ textarea{resize:vertical}
     font-size:28px;
   }
 }
+
+
+/* V8 · Inicio silencioso con clave recordada */
+.auth-loading-card{
+  text-align:center;
+}
+.loading-spinner{
+  width:28px;
+  height:28px;
+  margin:20px auto 2px;
+  border:3px solid var(--line);
+  border-top-color:var(--accent);
+  border-radius:50%;
+  animation:ikasi-spin .8s linear infinite;
+}
+@keyframes ikasi-spin{
+  to{transform:rotate(360deg)}
+}
+@media (prefers-reduced-motion: reduce){
+  .loading-spinner{animation:none;border-top-color:var(--line)}
+}
+@supports (padding: max(0px)){
+  .auth-gate{
+    padding-top:max(18px,env(safe-area-inset-top));
+    padding-right:max(14px,env(safe-area-inset-right));
+    padding-bottom:max(18px,env(safe-area-inset-bottom));
+    padding-left:max(14px,env(safe-area-inset-left));
+  }
+  .app-shell{
+    padding-left:max(12px,env(safe-area-inset-left));
+    padding-right:max(12px,env(safe-area-inset-right));
+    padding-bottom:max(44px,env(safe-area-inset-bottom));
+  }
+}
