@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0f172a">
+  <meta name="description" content="Planificador de estudio personal para el Máster en Ingeniería Industrial.">
+  <title>Ikasi · Plan de estudio</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon-192.png">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div>
+        <div class="brand">IKASI</div>
+        <div class="subtitle">Plan de estudio · Bimestre 1</div>
+      </div>
+      <div class="top-actions">
+        <button id="themeToggle" class="icon-btn" aria-label="Cambiar tema">◐</button>
+      </div>
+    </header>
+
+    <nav class="tabs" aria-label="Navegación principal">
+      <button class="tab active" data-view="today">Hoy</button>
+      <button class="tab" data-view="calendar">Calendario</button>
+      <button class="tab" data-view="progress">Progreso</button>
+      <button class="tab" data-view="admin">Admin</button>
+    </nav>
+
+    <main>
+      <section id="view-today" class="view active"></section>
+      <section id="view-calendar" class="view"></section>
+      <section id="view-progress" class="view"></section>
+      <section id="view-admin" class="view"></section>
+    </main>
+  </div>
+
+  <dialog id="editorDialog">
+    <form method="dialog" id="editorForm">
+      <div class="dialog-head">
+        <div>
+          <div class="eyebrow">ADMIN</div>
+          <h2 id="dialogTitle">Editar bloque</h2>
+        </div>
+        <button class="icon-btn" value="cancel" aria-label="Cerrar">✕</button>
+      </div>
+
+      <input type="hidden" id="editId">
+      <label>Fecha
+        <input id="editDate" type="date" required>
+      </label>
+      <label>Asignatura
+        <select id="editSubject" required></select>
+      </label>
+      <div class="two-col">
+        <label>Duración (min)
+          <input id="editMinutes" type="number" min="5" step="5" required>
+        </label>
+        <label>Estado
+          <select id="editCompleted">
+            <option value="false">Pendiente</option>
+            <option value="true">Hecho</option>
+          </select>
+        </label>
+      </div>
+      <label>Título
+        <input id="editTitle" type="text" required maxlength="120">
+      </label>
+      <label>Descripción
+        <textarea id="editDescription" rows="4" maxlength="500"></textarea>
+      </label>
+      <div class="dialog-actions">
+        <button type="button" class="btn ghost" id="deleteBlockBtn">Eliminar</button>
+        <div class="spacer"></div>
+        <button class="btn ghost" value="cancel">Cancelar</button>
+        <button type="button" class="btn primary" id="saveBlockBtn">Guardar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
