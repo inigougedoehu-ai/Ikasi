@@ -38,49 +38,7 @@
     </main>
   </div>
 
-  <dialog id="editorDialog">
-    <form method="dialog" id="editorForm">
-      <div class="dialog-head">
-        <div>
-          <div class="eyebrow">ADMIN</div>
-          <h2 id="dialogTitle">Editar bloque</h2>
-        </div>
-        <button class="icon-btn" value="cancel" aria-label="Cerrar">✕</button>
-      </div>
-
-      <input type="hidden" id="editId">
-      <label>Fecha
-        <input id="editDate" type="date" required>
-      </label>
-      <label>Asignatura
-        <select id="editSubject" required></select>
-      </label>
-      <div class="two-col">
-        <label>Duración (min)
-          <input id="editMinutes" type="number" min="5" step="5" required>
-        </label>
-        <label>Estado
-          <select id="editCompleted">
-            <option value="false">Pendiente</option>
-            <option value="true">Hecho</option>
-          </select>
-        </label>
-      </div>
-      <label>Título
-        <input id="editTitle" type="text" required maxlength="120">
-      </label>
-      <label>Descripción
-        <textarea id="editDescription" rows="4" maxlength="500"></textarea>
-      </label>
-      <div class="dialog-actions">
-        <button type="button" class="btn ghost" id="deleteBlockBtn">Eliminar</button>
-        <div class="spacer"></div>
-        <button class="btn ghost" value="cancel">Cancelar</button>
-        <button type="button" class="btn primary" id="saveBlockBtn">Guardar</button>
-      </div>
-    </form>
-  </dialog>
-
+  <script src="config.js"></script>
   <script src="data.js"></script>
   <script src="app.js"></script>
 </body>
