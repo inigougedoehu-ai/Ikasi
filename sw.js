@@ -1,4 +1,4 @@
-const CACHE="ikasi-v7-login-fix";
+const CACHE="ikasi-v8-remember-key";
 const ASSETS=[
   "./",
   "./index.html",
