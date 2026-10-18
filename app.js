@@ -1,7 +1,10 @@
-(() => {
+(async () => {
   const THEME_KEY = "ikasi-theme";
   const ACCESS_KEY_STORAGE = "ikasi-access-key";
   const PROGRESS_STORAGE = "ikasi-local-progress";
+  const KEY_DB = "ikasi-device";
+  const KEY_STORE = "settings";
+  const KEY_ID = "access-key";
 
   const $ = (q, root=document) => root.querySelector(q);
   const $$ = (q, root=document) => [...root.querySelectorAll(q)];
@@ -17,20 +20,96 @@
   let adminMessage = "";
   let weekOffset = 0;
 
-  function getAccessKey(){
-    return localStorage.getItem(ACCESS_KEY_STORAGE) || "";
+  function openKeyDb(){
+    return new Promise((resolve,reject)=>{
+      if(!("indexedDB" in window)) return reject(new Error("IndexedDB no disponible"));
+      const req=indexedDB.open(KEY_DB,1);
+      req.onupgradeneeded=()=>{
+        const db=req.result;
+        if(!db.objectStoreNames.contains(KEY_STORE)) db.createObjectStore(KEY_STORE);
+      };
+      req.onsuccess=()=>resolve(req.result);
+      req.onerror=()=>reject(req.error || new Error("No se pudo abrir IndexedDB"));
+    });
   }
 
-  function setAccessKey(key){
-    localStorage.setItem(ACCESS_KEY_STORAGE, key);
+  async function idbGetKey(){
+    try{
+      const db=await openKeyDb();
+      return await new Promise((resolve,reject)=>{
+        const tx=db.transaction(KEY_STORE,"readonly");
+        const req=tx.objectStore(KEY_STORE).get(KEY_ID);
+        req.onsuccess=()=>resolve(String(req.result || ""));
+        req.onerror=()=>reject(req.error);
+        tx.oncomplete=()=>db.close();
+      });
+    }catch{
+      return "";
+    }
   }
 
-  function clearAccessKey(){
-    localStorage.removeItem(ACCESS_KEY_STORAGE);
+  async function idbSetKey(key){
+    try{
+      const db=await openKeyDb();
+      await new Promise((resolve,reject)=>{
+        const tx=db.transaction(KEY_STORE,"readwrite");
+        tx.objectStore(KEY_STORE).put(String(key),KEY_ID);
+        tx.oncomplete=()=>resolve();
+        tx.onerror=()=>reject(tx.error);
+      });
+      db.close();
+    }catch{}
+  }
+
+  async function idbClearKey(){
+    try{
+      const db=await openKeyDb();
+      await new Promise((resolve,reject)=>{
+        const tx=db.transaction(KEY_STORE,"readwrite");
+        tx.objectStore(KEY_STORE).delete(KEY_ID);
+        tx.oncomplete=()=>resolve();
+        tx.onerror=()=>reject(tx.error);
+      });
+      db.close();
+    }catch{}
+  }
+
+  async function getAccessKey(){
+    try{
+      const local=localStorage.getItem(ACCESS_KEY_STORAGE) || "";
+      if(local) return local;
+    }catch{}
+    const durable=await idbGetKey();
+    if(durable){
+      try{ localStorage.setItem(ACCESS_KEY_STORAGE,durable); }catch{}
+    }
+    return durable;
+  }
+
+  async function setAccessKey(key){
+    try{ localStorage.setItem(ACCESS_KEY_STORAGE,key); }catch{}
+    await idbSetKey(key);
+    try{
+      if(navigator.storage && navigator.storage.persist) await navigator.storage.persist();
+    }catch{}
+  }
+
+  async function clearAccessKey(){
+    try{ localStorage.removeItem(ACCESS_KEY_STORAGE); }catch{}
+    await idbClearKey();
+  }
+
+  function showLoading(message="Comprobando acceso…"){
+    sourceState = "loading";
+    $("#appShell").hidden = true;
+    $("#authGate").hidden = true;
+    $("#loadingGate").hidden = false;
+    $("#loadingStatus").textContent = message;
   }
 
   function showLocked(message=""){
     sourceState = "locked";
+    $("#loadingGate").hidden = true;
     $("#appShell").hidden = true;
     $("#authGate").hidden = false;
     $("#authError").textContent = message;
@@ -39,6 +118,7 @@
   }
 
   function showApp(){
+    $("#loadingGate").hidden = true;
     $("#authGate").hidden = true;
     $("#appShell").hidden = false;
   }
@@ -66,7 +146,7 @@
   }
 
   async function fetchRemoteData(candidateKey=null){
-    const key = String(candidateKey || getAccessKey()).trim();
+    const key = String(candidateKey || await getAccessKey()).trim();
 
     if(!apiConfigured){
       showLocked("Falta configurar el endpoint de Google Apps Script.");
@@ -90,7 +170,7 @@
 
       if(!remote || remote.ok !== true){
         if(remote && remote.error === "unauthorized"){
-          clearAccessKey();
+          await clearAccessKey();
           showLocked("Clave incorrecta.");
           return false;
         }
@@ -104,12 +184,13 @@
         settings: remote.settings || {}
       };
 
-      setAccessKey(key);
+      await setAccessKey(key);
       sourceState = "remote";
       sourceUpdatedAt = remote.updatedAt || null;
       applyLocalProgress();
       showApp();
       renderAll();
+      if(typeof startAutoSync==="function") startAutoSync();
       return true;
     }catch(err){
       console.warn("Ikasi: no se pudo cargar Google Sheets", err);
@@ -119,7 +200,7 @@
   }
 
   async function syncCompleted(id, completed){
-    const key = getAccessKey();
+    const key = await getAccessKey();
     if(!apiConfigured || !key) return {ok:false, unauthorized:true};
 
     try{
@@ -133,7 +214,7 @@
       const out = await res.json();
 
       if(out && out.error === "unauthorized"){
-        clearAccessKey();
+        await clearAccessKey();
         showLocked("La clave ya no es válida. Vuelve a introducirla.");
         return {ok:false, unauthorized:true};
       }
@@ -450,8 +531,8 @@
       }
     };
 
-    $("#logoutIkasi").onclick=()=>{
-      clearAccessKey();
+    $("#logoutIkasi").onclick=async()=>{
+      await clearAccessKey();
       data=clone(window.IKASI_DEFAULT_DATA);
       showLocked("");
     };
@@ -500,7 +581,7 @@
       return;
     }
 
-    $("#authError").textContent="Comprobando…";
+    showLoading("Comprobando clave…");
     await fetchRemoteData(key);
   });
 
@@ -524,9 +605,31 @@
     });
   }
 
-  const savedKey=getAccessKey();
+  let autoSyncStarted=false;
+
+  function startAutoSync(){
+    if(autoSyncStarted) return;
+    autoSyncStarted=true;
+
+    setInterval(()=>{
+      if(!document.hidden && sourceState==="remote") fetchRemoteData();
+    },60000);
+
+    document.addEventListener("visibilitychange",()=>{
+      if(!document.hidden && sourceState==="remote") fetchRemoteData();
+    });
+
+    window.addEventListener("focus",()=>{
+      if(sourceState==="remote") fetchRemoteData();
+    });
+  }
+
+  showLoading("Cargando tu planificación…");
+  const savedKey=await getAccessKey();
+
   if(savedKey){
-    fetchRemoteData(savedKey);
+    const ok=await fetchRemoteData(savedKey);
+    if(ok) startAutoSync();
   }else{
     showLocked("");
   }
