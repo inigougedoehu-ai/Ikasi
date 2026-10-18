@@ -12,7 +12,17 @@
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <section id="authGate" class="auth-gate">
+  <section id="loadingGate" class="auth-gate">
+    <div class="auth-card auth-loading-card">
+      <div class="auth-mark">K</div>
+      <div class="eyebrow">IKASI</div>
+      <h1>Cargando Ikasi</h1>
+      <p id="loadingStatus" class="muted">Comprobando acceso…</p>
+      <div class="loading-spinner" aria-hidden="true"></div>
+    </div>
+  </section>
+
+  <section id="authGate" class="auth-gate" hidden>
     <div class="auth-card">
       <div class="auth-mark">K</div>
       <div class="eyebrow">IKASI</div>
