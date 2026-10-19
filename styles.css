@@ -297,3 +297,119 @@ textarea{resize:vertical}
     padding-bottom:max(44px,env(safe-area-inset-bottom));
   }
 }
+
+
+/* V9 · Tiempo real */
+.task-meta{
+  display:flex;
+  flex-direction:column;
+  align-items:flex-end;
+  gap:6px;
+}
+.time-label{
+  font-size:10px;
+  color:var(--muted);
+  text-transform:uppercase;
+  letter-spacing:.08em;
+  font-weight:800;
+}
+.actual-time{
+  border:1px solid var(--line);
+  background:var(--panel2);
+  color:var(--text);
+  border-radius:10px;
+  padding:7px 9px;
+  font-size:12px;
+  font-weight:850;
+  min-height:36px;
+}
+.actual-time.has-time{
+  border-color:color-mix(in srgb,var(--subject) 70%,var(--line));
+  background:color-mix(in srgb,var(--subject) 18%,var(--panel));
+}
+.session-stats{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  margin-top:12px;
+}
+.stat-chip{
+  padding:7px 10px;
+  border:1px solid var(--line);
+  border-radius:999px;
+  background:var(--panel2);
+  color:var(--muted);
+  font-size:12px;
+  font-weight:750;
+}
+.time-dialog{
+  width:min(520px,calc(100vw - 24px));
+  max-width:520px;
+}
+#timeForm{padding:22px}
+.time-value{
+  text-align:center;
+  font-size:42px;
+  line-height:1;
+  font-weight:950;
+  margin:26px 0 18px;
+}
+.time-range{
+  width:100%;
+  accent-color:var(--accent);
+  margin:0;
+}
+.time-stepper{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+  margin:16px 0 10px;
+}
+.time-stepper .btn{
+  min-height:46px;
+}
+.time-quick{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  margin:10px 0 18px;
+}
+.time-quick .btn{
+  flex:1 1 auto;
+}
+.completion-row{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  padding:13px 14px;
+  border:1px solid var(--line);
+  background:var(--panel2);
+  border-radius:14px;
+}
+.completion-row input{
+  width:22px;
+  height:22px;
+  margin:0;
+}
+.progress-card .progress-row strong{
+  color:var(--text);
+}
+@media(max-width:560px){
+  .task-meta{
+    grid-column:2;
+    align-items:flex-start;
+    text-align:left;
+  }
+  .time-dialog{
+    width:calc(100vw - 16px);
+    max-width:none;
+    margin:auto 8px 8px;
+    border-radius:22px 22px 18px 18px;
+  }
+  #timeForm{
+    padding:20px 16px calc(18px + env(safe-area-inset-bottom));
+  }
+  .time-value{
+    font-size:38px;
+  }
+}
