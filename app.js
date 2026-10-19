@@ -724,7 +724,7 @@
 
   $("#timeRange").addEventListener("input",updateTimePreview);
 
-  $("[data-time-delta]").forEach(btn=>{
+  $$("[data-time-delta]").forEach(btn=>{
     btn.addEventListener("click",()=>{
       const range=$("#timeRange");
       const next=Math.max(0,Math.min(Number(range.max),Number(range.value)+Number(btn.dataset.timeDelta)));
@@ -733,7 +733,7 @@
     });
   });
 
-  $("[data-time-quick]").forEach(btn=>{
+  $$("[data-time-quick]").forEach(btn=>{
     btn.addEventListener("click",()=>{
       const t=data.schedule.find(x=>x.id===editingTaskId);
       if(!t) return;
