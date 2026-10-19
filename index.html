@@ -64,6 +64,47 @@
     </main>
   </div>
 
+  <dialog id="timeDialog" class="time-dialog">
+    <form method="dialog" id="timeForm">
+      <div class="dialog-head">
+        <div>
+          <div class="eyebrow">TIEMPO REAL</div>
+          <h2 id="timeDialogTitle">Registrar sesión</h2>
+          <div id="timeDialogPlanned" class="muted"></div>
+        </div>
+        <button class="icon-btn" value="cancel" aria-label="Cerrar">✕</button>
+      </div>
+
+      <div class="time-value" id="timeValue">0 min</div>
+      <input id="timeRange" class="time-range" type="range" min="0" max="240" step="15" value="0" aria-label="Minutos reales">
+
+      <div class="time-stepper">
+        <button type="button" class="btn" data-time-delta="-15">−15 min</button>
+        <button type="button" class="btn" data-time-delta="15">+15 min</button>
+      </div>
+
+      <div class="time-quick" aria-label="Valores rápidos">
+        <button type="button" class="btn ghost" data-time-quick="30">30 min</button>
+        <button type="button" class="btn ghost" data-time-quick="60">1 h</button>
+        <button type="button" class="btn ghost" data-time-quick="90">1 h 30</button>
+        <button type="button" class="btn ghost" data-time-quick="120">2 h</button>
+        <button type="button" class="btn ghost" data-time-quick="planned">= previsto</button>
+      </div>
+
+      <label class="completion-row">
+        <input id="timeCompleted" type="checkbox">
+        <span>Sesión completada</span>
+      </label>
+
+      <div class="dialog-actions">
+        <button type="button" class="btn ghost" id="clearTimeBtn">Poner a 0</button>
+        <div class="spacer"></div>
+        <button class="btn ghost" value="cancel">Cancelar</button>
+        <button type="button" class="btn primary" id="saveTimeBtn">Guardar</button>
+      </div>
+    </form>
+  </dialog>
+
   <script src="config.js"></script>
   <script src="data.js"></script>
   <script src="app.js"></script>
