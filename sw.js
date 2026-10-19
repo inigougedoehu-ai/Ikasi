@@ -1,4 +1,4 @@
-const CACHE="ikasi-v8-remember-key";
+const CACHE="ikasi-v9-real-time";
 const ASSETS=[
   "./",
   "./index.html",
