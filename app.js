@@ -135,13 +135,25 @@
   function applyLocalProgress(){
     const p = loadProgress();
     data.schedule.forEach(t => {
-      if (Object.prototype.hasOwnProperty.call(p, t.id)) t.completed = !!p[t.id];
+      t.actualMinutes = Math.max(0, Number(t.actualMinutes) || 0);
+      const local = p[t.id];
+      if(local && typeof local === "object" && local.pending){
+        if(Object.prototype.hasOwnProperty.call(local,"completed")) t.completed = !!local.completed;
+        if(Object.prototype.hasOwnProperty.call(local,"actualMinutes")) t.actualMinutes = Math.max(0, Number(local.actualMinutes) || 0);
+      }
     });
   }
 
-  function rememberProgress(id, value){
+  function rememberProgress(id, patch){
     const p = loadProgress();
-    p[id] = !!value;
+    const old = (p[id] && typeof p[id] === "object") ? p[id] : {};
+    p[id] = {...old, ...patch, pending:true};
+    saveProgress(p);
+  }
+
+  function clearPendingProgress(id){
+    const p = loadProgress();
+    delete p[id];
     saveProgress(p);
   }
 
@@ -179,7 +191,10 @@
 
       data = {
         subjects: remote.subjects || {},
-        schedule: remote.schedule || [],
+        schedule: (remote.schedule || []).map(t=>({
+          ...t,
+          actualMinutes:Math.max(0,Number(t.actualMinutes)||0)
+        })),
         fixedDays: remote.fixedDays || {},
         settings: remote.settings || {}
       };
@@ -199,7 +214,7 @@
     }
   }
 
-  async function syncCompleted(id, completed){
+  async function syncProgress(id, completed, actualMinutes){
     const key = await getAccessKey();
     if(!apiConfigured || !key) return {ok:false, unauthorized:true};
 
@@ -207,7 +222,13 @@
       const res = await fetch(API_URL, {
         method:"POST",
         headers:{"Content-Type":"text/plain;charset=utf-8"},
-        body:JSON.stringify({action:"setCompleted", id, completed, key}),
+        body:JSON.stringify({
+          action:"setProgress",
+          id,
+          completed:!!completed,
+          actualMinutes:Math.max(0, Math.round(Number(actualMinutes)||0)),
+          key
+        }),
         redirect:"follow"
       });
 
@@ -220,9 +241,10 @@
       }
 
       if(!out.ok) throw new Error(out.error || "No se pudo sincronizar");
+      clearPendingProgress(id);
       return out;
     }catch(err){
-      console.warn("Ikasi: fallo al sincronizar check", err);
+      console.warn("Ikasi: fallo al sincronizar progreso", err);
       return {ok:false, error:String(err.message || err)};
     }
   }
@@ -275,6 +297,22 @@
     return tasks.filter(t=>t.completed).reduce((a,t)=>a+(Number(t.minutes)||0),0);
   }
 
+  function actualMinutes(tasks){
+    return tasks.reduce((a,t)=>a+Math.max(0,Number(t.actualMinutes)||0),0);
+  }
+
+  function adherenceMinutes(tasks){
+    return tasks.reduce((a,t)=>{
+      const planned=Math.max(0,Number(t.minutes)||0);
+      const actual=Math.max(0,Number(t.actualMinutes)||0);
+      return a+Math.min(planned,actual);
+    },0);
+  }
+
+  function completedCount(tasks){
+    return tasks.filter(t=>t.completed).length;
+  }
+
   function examDate(s){
     return s ? new Date(s) : null;
   }
@@ -304,6 +342,7 @@
 
   function taskHTML(t){
     const s=subj(t.subject);
+    const actual=Math.max(0,Number(t.actualMinutes)||0);
     return `
       <article class="task ${t.completed?"done":""}" style="--subject:${s.color}">
         <button class="check" data-toggle="${escapeHTML(t.id)}" aria-label="Marcar ${t.completed?"pendiente":"hecho"}">${t.completed?"✓":""}</button>
@@ -312,7 +351,13 @@
           <div class="task-desc">${escapeHTML(t.description||"")}</div>
         </div>
         <div class="task-meta">
-          <div class="minutes">${fmtMinutes(t.minutes)}</div>
+          <div>
+            <div class="time-label">Previsto</div>
+            <div class="minutes">${fmtMinutes(t.minutes)}</div>
+          </div>
+          <button class="actual-time ${actual>0?"has-time":""}" data-time="${escapeHTML(t.id)}">
+            Real · ${actual>0?fmtMinutes(actual):"—"}
+          </button>
           <div class="subject-name">${escapeHTML(s.short)}</div>
         </div>
       </article>`;
@@ -321,8 +366,12 @@
   function renderToday(){
     const view=$("#view-today");
     const key=todayKey(), tasks=tasksForDate(key);
-    const total=totalMinutes(tasks), done=doneMinutes(tasks);
-    const pct=total?Math.round(done/total*100):0;
+    const total=totalMinutes(tasks);
+    const actual=actualMinutes(tasks);
+    const adherence=adherenceMinutes(tasks);
+    const adherencePct=total?Math.round(adherence/total*100):0;
+    const realPct=total?Math.round(actual/total*100):0;
+    const sessionsDone=completedCount(tasks);
     const exam=nextExam(parseDateKey(key));
 
     let examBlock="";
@@ -346,9 +395,14 @@
         <div class="card">
           <div class="eyebrow">PLAN DE HOY · GOOGLE SHEETS</div>
           <h1>${capitalize(formatDate(key))}</h1>
-          <div class="muted">${done?`${fmtMinutes(done)} completados de ${fmtMinutes(total)}`:`${fmtMinutes(total)} previstos`}</div>
+          <div class="muted">${fmtMinutes(actual)} reales de ${fmtMinutes(total)} previstas</div>
           <div class="bar" style="margin-top:16px">
-            <span style="width:${pct}%;background:var(--accent)"></span>
+            <span style="width:${Math.min(100,adherencePct)}%;background:var(--accent)"></span>
+          </div>
+          <div class="session-stats">
+            <span class="stat-chip">Adherencia · ${adherencePct}%</span>
+            <span class="stat-chip">Horas reales · ${realPct}%</span>
+            <span class="stat-chip">Sesiones · ${sessionsDone}/${tasks.length}</span>
           </div>
           ${data.fixedDays?.[key]?`<div class="fixed-note">${escapeHTML(data.fixedDays[key])}</div>`:""}
         </div>
@@ -357,7 +411,7 @@
 
       <div class="section-title">
         <h2>Bloques de estudio</h2>
-        <span class="pill">${pct}% completado</span>
+        <span class="pill">${adherencePct}% adherencia</span>
       </div>
 
       <div class="task-list">
@@ -366,6 +420,9 @@
 
     $$('[data-toggle]',view).forEach(btn=>{
       btn.onclick=()=>toggleTask(btn.dataset.toggle);
+    });
+    $$('[data-time]',view).forEach(btn=>{
+      btn.onclick=()=>openTimeEditor(btn.dataset.time);
     });
   }
 
@@ -404,8 +461,9 @@
 
           ${tasks.map(t=>{
             const s=subj(t.subject);
+            const actual=Math.max(0,Number(t.actualMinutes)||0);
             return `<div class="mini-task ${t.completed?"done":""}" style="--subject:${s.color}">
-              <strong>${escapeHTML(s.short)} · ${fmtMinutes(t.minutes)}</strong>${escapeHTML(t.title)}
+              <strong>${escapeHTML(s.short)} · P ${fmtMinutes(t.minutes)} · R ${actual?fmtMinutes(actual):"—"}</strong>${escapeHTML(t.title)}
             </div>`;
           }).join("")}
 
@@ -434,24 +492,35 @@
     const bySubject=Object.keys(data.subjects).map(id=>{
       const tasks=data.schedule.filter(t=>t.subject===id);
       const total=totalMinutes(tasks);
-      const done=doneMinutes(tasks);
-      const pct=total?Math.round(done/total*100):0;
-      return {id,total,done,pct};
+      const actual=actualMinutes(tasks);
+      const adherence=adherenceMinutes(tasks);
+      const adherencePct=total?Math.round(adherence/total*100):0;
+      const realPct=total?Math.round(actual/total*100):0;
+      return {
+        id,total,actual,adherencePct,realPct,
+        completed:completedCount(tasks),
+        sessions:tasks.length
+      };
     });
 
     const total=totalMinutes(data.schedule);
-    const done=doneMinutes(data.schedule);
-    const pct=total?Math.round(done/total*100):0;
+    const actual=actualMinutes(data.schedule);
+    const adherence=adherenceMinutes(data.schedule);
+    const adherencePct=total?Math.round(adherence/total*100):0;
+    const realPct=total?Math.round(actual/total*100):0;
+    const sessionsDone=completedCount(data.schedule);
 
     const cards=bySubject.map(x=>{
       const s=subj(x.id),exam=examDate(s.exam);
       return `
         <div class="card progress-card" style="--subject:${s.color}">
           <div class="progress-title">${escapeHTML(s.short)}</div>
-          <div class="progress-row"><span>Hecho</span><strong>${fmtMinutes(x.done)}</strong></div>
+          <div class="progress-row"><span>Real</span><strong>${fmtMinutes(x.actual)}</strong></div>
           <div class="progress-row"><span>Planificado</span><strong>${fmtMinutes(x.total)}</strong></div>
-          <div class="bar"><span style="width:${x.pct}%"></span></div>
-          <div class="progress-row"><span>Progreso</span><strong>${x.pct}%</strong></div>
+          <div class="progress-row"><span>Sesiones</span><strong>${x.completed}/${x.sessions}</strong></div>
+          <div class="bar"><span style="width:${Math.min(100,x.adherencePct)}%"></span></div>
+          <div class="progress-row"><span>Adherencia</span><strong>${x.adherencePct}%</strong></div>
+          <div class="progress-row"><span>Horas reales / previstas</span><strong>${x.realPct}%</strong></div>
           <div class="muted" style="font-size:12px">Examen · ${exam&&!isNaN(exam)?new Intl.DateTimeFormat("es-ES",{day:"numeric",month:"long"}).format(exam):"—"}</div>
         </div>`;
     }).join("");
@@ -459,21 +528,31 @@
     view.innerHTML=`
       <div class="section-title">
         <h2>Progreso por asignatura</h2>
-        <span class="pill">${pct}% global</span>
+        <span class="pill">${adherencePct}% adherencia global</span>
       </div>
       <div class="progress-grid">${cards}</div>
       <div class="overall-grid">
         <div class="card">
-          <div class="eyebrow">TOTAL DEL PLAN</div>
+          <div class="eyebrow">PLANIFICADO</div>
           <div class="big-number">${fmtMinutes(total)}</div>
-          <div class="muted">horas de estudio planificadas</div>
+          <div class="muted">horas previstas</div>
         </div>
         <div class="card">
-          <div class="eyebrow">COMPLETADO</div>
-          <div class="big-number">${fmtMinutes(done)}</div>
+          <div class="eyebrow">TIEMPO REAL</div>
+          <div class="big-number">${fmtMinutes(actual)}</div>
+          <div class="muted">${realPct}% de las horas previstas</div>
+        </div>
+        <div class="card">
+          <div class="eyebrow">ADHERENCIA</div>
+          <div class="big-number">${adherencePct}%</div>
           <div class="bar" style="margin-top:14px">
-            <span style="width:${pct}%;background:var(--accent)"></span>
+            <span style="width:${Math.min(100,adherencePct)}%;background:var(--accent)"></span>
           </div>
+        </div>
+        <div class="card">
+          <div class="eyebrow">SESIONES COMPLETADAS</div>
+          <div class="big-number">${sessionsDone}/${data.schedule.length}</div>
+          <div class="muted">check y horas son métricas independientes</div>
         </div>
       </div>`;
   }
@@ -496,7 +575,7 @@
         <div class="card">
           <div class="eyebrow">HORARIO MAESTRO</div>
           <div class="progress-title" style="margin-top:8px">Editar en Google Sheets</div>
-          <div class="muted">Fecha, asignatura, minutos, título, descripción y bloques nuevos se cambian en el Sheet privado.</div>
+          <div class="muted">Fecha, asignatura, minutos previstos, título, descripción y bloques nuevos se cambian en el Sheet privado. El tiempo real también queda registrado allí.</div>
           ${updated}
           <div class="admin-toolbar" style="margin-top:16px">
             <button class="btn primary" id="reloadRemote">Recargar desde Sheets</button>
@@ -543,20 +622,78 @@
     if(!t) return;
 
     t.completed=!t.completed;
-    rememberProgress(id,t.completed);
+    if(t.completed && !(Number(t.actualMinutes)>0)){
+      t.actualMinutes=Number(t.minutes)||0;
+    }
+
+    rememberProgress(id,{
+      completed:t.completed,
+      actualMinutes:Math.max(0,Number(t.actualMinutes)||0)
+    });
     renderAll();
 
-    const result=await syncCompleted(id,t.completed);
+    const result=await syncProgress(id,t.completed,t.actualMinutes);
 
     if(result.ok){
-      adminMessage="Último check sincronizado con Google Sheets.";
+      adminMessage="Progreso sincronizado con Google Sheets.";
     }else if(result.unauthorized){
       return;
     }else{
-      adminMessage="El cambio queda visible en este dispositivo, pero no se pudo sincronizar con Google Sheets.";
+      adminMessage="El cambio queda guardado en este dispositivo, pero falta sincronizarlo con Google Sheets.";
       renderAdmin();
     }
   }
+
+  let editingTaskId=null;
+
+  function updateTimePreview(){
+    const range=$("#timeRange");
+    if(!range) return;
+    $("#timeValue").textContent=fmtMinutes(Number(range.value)||0);
+  }
+
+  function openTimeEditor(id){
+    const t=data.schedule.find(x=>x.id===id);
+    if(!t) return;
+
+    editingTaskId=id;
+    const planned=Math.max(0,Number(t.minutes)||0);
+    const actual=Math.max(0,Number(t.actualMinutes)||0);
+    const max=Math.max(240,Math.ceil((planned*2)/15)*15,Math.ceil((actual+60)/15)*15);
+
+    $("#timeDialogTitle").textContent=t.title;
+    $("#timeDialogPlanned").textContent=`Previsto: ${fmtMinutes(planned)}`;
+    $("#timeRange").max=String(max);
+    $("#timeRange").value=String(actual);
+    $("#timeCompleted").checked=!!t.completed;
+    updateTimePreview();
+    $("#timeDialog").showModal();
+  }
+
+  async function saveTimeEditor(){
+    const t=data.schedule.find(x=>x.id===editingTaskId);
+    if(!t) return;
+
+    t.actualMinutes=Math.max(0,Number($("#timeRange").value)||0);
+    t.completed=!!$("#timeCompleted").checked;
+
+    rememberProgress(t.id,{
+      completed:t.completed,
+      actualMinutes:t.actualMinutes
+    });
+
+    $("#timeDialog").close();
+    renderAll();
+
+    const result=await syncProgress(t.id,t.completed,t.actualMinutes);
+    if(result.ok){
+      adminMessage="Tiempo real y estado sincronizados con Google Sheets.";
+    }else if(!result.unauthorized){
+      adminMessage="El tiempo queda guardado en este dispositivo, pero falta sincronizarlo con Google Sheets.";
+      renderAdmin();
+    }
+  }
+
 
   function renderAll(){
     renderToday();
@@ -584,6 +721,36 @@
     showLoading("Comprobando clave…");
     await fetchRemoteData(key);
   });
+
+  $("#timeRange").addEventListener("input",updateTimePreview);
+
+  $("[data-time-delta]").forEach(btn=>{
+    btn.addEventListener("click",()=>{
+      const range=$("#timeRange");
+      const next=Math.max(0,Math.min(Number(range.max),Number(range.value)+Number(btn.dataset.timeDelta)));
+      range.value=String(next);
+      updateTimePreview();
+    });
+  });
+
+  $("[data-time-quick]").forEach(btn=>{
+    btn.addEventListener("click",()=>{
+      const t=data.schedule.find(x=>x.id===editingTaskId);
+      if(!t) return;
+      const value=btn.dataset.timeQuick==="planned" ? Number(t.minutes)||0 : Number(btn.dataset.timeQuick)||0;
+      const range=$("#timeRange");
+      if(value>Number(range.max)) range.max=String(Math.ceil(value/15)*15);
+      range.value=String(value);
+      updateTimePreview();
+    });
+  });
+
+  $("#clearTimeBtn").addEventListener("click",()=>{
+    $("#timeRange").value="0";
+    updateTimePreview();
+  });
+
+  $("#saveTimeBtn").addEventListener("click",saveTimeEditor);
 
   function initTheme(){
     const saved=localStorage.getItem(THEME_KEY);
